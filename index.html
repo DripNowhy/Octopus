@@ -1,0 +1,1529 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Learning Self-Correction in Vision–Language Models via Rollout Augmentation">
+  <meta name="keywords" content="Octopus, Self-Correction, Vision-Language Models">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Octopus: Learning Self-Correction in Vision–Language Models</title>
+
+  <link rel="icon" href="./static/images/sherlock_logo.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #fafafa;
+      --fg: #111;
+      --fg-muted: #666;
+      --border: #e5e5e5;
+      --accent: #0066ff;
+      --accent-dark: #0052cc;
+      --success: #00c853;
+      --error: #ff3d00;
+      --surface: #fff;
+      --surface-elevated: #fff;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    /* Grid Background */
+    .grid-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* Scroll Animation */
+    .reveal {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .reveal.active { opacity: 1; transform: translateY(0); }
+
+    /* Hero - Clean Header */
+    .hero {
+      min-height: auto;
+      display: flex;
+      flex-direction: column;
+      padding: 4rem 2rem 3rem;
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+    }
+
+    /* Case Section */
+    .case-section {
+      padding: 3rem 2rem;
+      background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .case-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .case-question {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .q-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    .case-question h3 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--fg);
+    }
+
+    /* Case Demo Layout */
+    .case-demo {
+      display: grid;
+      grid-template-columns: 1fr 0.9fr 1.4fr;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    @media (max-width: 1000px) {
+      .case-demo {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+    }
+
+    /* Case Image */
+    .case-image-wrap {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    .case-image-wrap img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .image-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 184, 0, 0.1);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .image-overlay.active {
+      opacity: 1;
+    }
+
+    /* Octopus in middle */
+    .case-octopus {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      min-height: 300px;
+      justify-content: center;
+    }
+
+    @media (max-width: 1000px) {
+      .case-octopus {
+        order: -1;
+        min-height: 200px;
+      }
+    }
+
+    .orbit-ring {
+      position: absolute;
+      border: 1px solid rgba(0,0,0,0.06);
+      border-radius: 50%;
+      pointer-events: none;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .ring-outer {
+      width: 340px;
+      height: 340px;
+      animation: orbit-rotate 25s linear infinite;
+    }
+
+    .ring-inner {
+      width: 280px;
+      height: 280px;
+      animation: orbit-rotate 18s linear infinite reverse;
+    }
+
+    @keyframes orbit-rotate {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    .logo-core {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .logo-img {
+      width: 180px;
+      height: 180px;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 20px rgba(0,0,0,0.1));
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .logo-img.thinking {
+      filter: drop-shadow(0 0 40px rgba(255, 184, 0, 0.4));
+      transform: scale(1.03);
+    }
+
+    .logo-img.correcting {
+      filter: drop-shadow(0 0 40px rgba(255, 59, 48, 0.35));
+      animation: subtle-shake 0.4s ease-in-out;
+    }
+
+    .logo-img.correct {
+      filter: drop-shadow(0 0 40px rgba(52, 199, 89, 0.4));
+      transform: scale(1.03);
+    }
+
+    @keyframes subtle-shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-2px); }
+      75% { transform: translateX(2px); }
+    }
+
+    .status-indicator {
+      position: absolute;
+      bottom: 10px;
+      right: 15px;
+      width: 12px;
+      height: 12px;
+      background: #34c759;
+      border-radius: 50%;
+      border: 2px solid white;
+      opacity: 0;
+      transition: opacity 0.3s;
+      box-shadow: 0 0 10px currentColor;
+      z-index: 20;
+    }
+
+    .status-indicator.active {
+      opacity: 1;
+      animation: pulse-glow 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 5px currentColor; }
+      50% { box-shadow: 0 0 15px currentColor; }
+    }
+
+    .octopus-status {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--fg-muted);
+      background: rgba(255,255,255,0.9);
+      padding: 6px 14px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      z-index: 10;
+    }
+
+    /* Output Panels */
+    .case-outputs {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .output-panel {
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f8f9fa;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .panel-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: all 0.3s;
+    }
+
+    .panel-dot.active {
+      background: #34c759;
+      animation: blink-dot 2s infinite;
+    }
+
+    @keyframes blink-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .panel-body {
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      min-height: 80px;
+    }
+
+    .cursor-blink {
+      display: inline-block;
+      width: 2px;
+      height: 14px;
+      background: var(--accent);
+      margin-left: 2px;
+      animation: cursor-blink 1s infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes cursor-blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    /* Trace Flow */
+    .trace-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .trace-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #f5f5f7;
+      border-radius: 8px;
+      transition: all 0.3s;
+      border: 2px solid transparent;
+    }
+
+    .trace-step.active {
+      background: #fff;
+      border-color: var(--accent);
+      box-shadow: 0 2px 10px rgba(0,102,255,0.08);
+    }
+
+    .step-badge {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--border);
+      color: var(--fg-muted);
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .trace-step.active .step-badge {
+      background: var(--accent);
+      color: white;
+    }
+
+    .step-name {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--fg-muted);
+      padding: 2px 6px;
+      background: rgba(0,0,0,0.04);
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .step-name.correct {
+      background: rgba(52, 199, 89, 0.12);
+      color: #34c759;
+    }
+
+    .step-ans {
+      font-weight: 700;
+      font-size: 14px;
+      margin-left: auto;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .step-ans.wrong { color: #ff3b30; }
+    .step-ans.correct { color: #34c759; }
+
+    .step-mark {
+      font-size: 12px;
+    }
+
+    .step-arrow {
+      text-align: center;
+      color: var(--border);
+      font-size: 14px;
+      height: 0;
+      opacity: 0;
+      transition: all 0.3s;
+      overflow: hidden;
+    }
+
+    .step-arrow.show {
+      height: 16px;
+      opacity: 1;
+    }
+
+    .hero-content {
+      max-width: 900px;
+      margin: 0 auto;
+      text-align: center;
+      padding-top: 2rem;
+    }
+
+    .hero-title {
+      font-size: clamp(1.75rem, 4vw, 2.75rem);
+      font-weight: 600;
+      line-height: 1.2;
+      margin-bottom: 2rem;
+      letter-spacing: -0.02em;
+    }
+
+    .hero-title em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    /* Authors - Clean List Style */
+    .authors {
+      margin: 2.5rem 0;
+      font-size: 1.05rem;
+    }
+
+    .authors-list {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.25rem;
+      align-items: center;
+    }
+
+    .authors-list a {
+      color: var(--fg);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .authors-list a:hover {
+      color: var(--accent);
+    }
+
+    .authors-list .affil {
+      color: var(--fg-muted);
+      font-size: 0.85em;
+      font-weight: 400;
+    }
+
+    .authors-list .sep {
+      color: var(--border);
+      margin: 0 0.5rem;
+    }
+
+    .affiliations {
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--fg-muted);
+    }
+
+    /* Buttons - Minimal */
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-top: 2.5rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1.25rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--fg);
+    }
+
+    .btn:hover {
+      border-color: var(--fg);
+      background: var(--fg);
+      color: var(--surface);
+    }
+
+    .btn-primary {
+      background: var(--fg);
+      color: var(--surface);
+      border-color: var(--fg);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Sections */
+    .section {
+      padding: 5rem 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section:last-of-type {
+      border-bottom: none;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-header {
+      margin-bottom: 3rem;
+    }
+
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 0.75rem;
+    }
+
+    .section-title {
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-weight: 600;
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+    }
+
+    .section-subtitle {
+      margin-top: 0.75rem;
+      color: var(--fg-muted);
+      max-width: 600px;
+    }
+
+    /* Abstract */
+    .abstract {
+      max-width: 800px;
+      font-size: 1.05rem;
+      line-height: 1.8;
+      color: var(--fg-muted);
+    }
+
+    .abstract p + p {
+      margin-top: 1rem;
+    }
+
+    .abstract strong {
+      color: var(--fg);
+      font-weight: 600;
+    }
+
+    /* Two Column Layout */
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    /* Content Block */
+    .content-block {
+      padding: 2rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .content-block h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .content-block h3 .tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      padding: 0.25rem 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .tag-error {
+      background: rgba(255, 61, 0, 0.1);
+      color: var(--error);
+    }
+
+    .tag-success {
+      background: rgba(0, 200, 83, 0.1);
+      color: var(--success);
+    }
+
+    .tag-accent {
+      background: rgba(0, 102, 255, 0.1);
+      color: var(--accent);
+    }
+
+    .content-block p, .content-block li {
+      color: var(--fg-muted);
+      line-height: 1.75;
+    }
+
+    .content-block ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .content-block li {
+      position: relative;
+      padding-left: 1.25rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .content-block li::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: var(--fg-muted);
+    }
+
+    .content-block strong {
+      color: var(--fg);
+    }
+
+    .figure {
+      margin: 1.5rem 0;
+      border: 1px solid var(--border);
+    }
+
+    .figure img {
+      width: 100%;
+      display: block;
+    }
+
+    .takeaway {
+      margin-top: 1.5rem;
+      padding: 1.25rem;
+      background: rgba(0, 102, 255, 0.03);
+      border-left: 2px solid var(--accent);
+      font-size: 0.95rem;
+    }
+
+    .takeaway-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Highlight Box */
+    .highlight-box {
+      padding: 3rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .highlight-box .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 1.5rem;
+    }
+
+    .highlight-box h3 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+
+    .highlight-box p {
+      color: var(--fg-muted);
+      max-width: 700px;
+      margin: 0 auto 2rem;
+      line-height: 1.8;
+    }
+
+    /* Feature Grid */
+    .feature-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      margin-top: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .feature-row { grid-template-columns: 1fr; }
+    }
+
+    .feature-item {
+      background: var(--surface);
+      padding: 2rem;
+    }
+
+    .feature-item h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+
+    .feature-item p {
+      font-size: 0.9rem;
+      color: var(--fg-muted);
+      line-height: 1.6;
+    }
+
+    /* Experiments */
+    .experiment {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+
+    .experiment-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .experiment-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .experiment-title {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .experiment-body {
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .experiment-body img {
+      max-width: 100%;
+      height: auto;
+      border: 1px solid var(--border);
+    }
+
+    /* Carousel */
+    .carousel-wrap {
+      position: relative;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .carousel-viewport {
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .carousel-track {
+      display: flex;
+      transition: transform 0.4s ease;
+    }
+
+    .carousel-slide {
+      min-width: 100%;
+      padding: 2rem;
+    }
+
+    .carousel-slide img {
+      width: 100%;
+      border: 1px solid var(--border);
+    }
+
+    .carousel-nav {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .carousel-arrow {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 1.25rem;
+    }
+
+    .carousel-arrow:hover {
+      background: var(--fg);
+      color: var(--surface);
+      border-color: var(--fg);
+    }
+
+    .carousel-dots {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .carousel-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--border);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .carousel-dot.active {
+      background: var(--fg);
+    }
+
+    /* BibTeX */
+    .bibtex-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .bibtex-header {
+      padding: 0.75rem 1rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .bibtex-header span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+
+    .bibtex-header span:nth-child(1) { background: #ff5f56; }
+    .bibtex-header span:nth-child(2) { background: #ffbd2e; }
+    .bibtex-header span:nth-child(3) { background: #27c93f; }
+
+    .bibtex-body {
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+
+    .bibtex-body pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 0;
+      color: var(--fg);
+    }
+
+    /* Footer */
+    .footer {
+      padding: 3rem 2rem;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+      border-top: 1px solid var(--border);
+    }
+
+    .footer a {
+      color: var(--fg);
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85em;
+      background: rgba(0,0,0,0.04);
+      padding: 0.15rem 0.4rem;
+    }
+
+    sup {
+      font-size: 0.7em;
+      color: var(--fg-muted);
+      margin-left: 0.15rem;
+    }
+
+    .affiliations {
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--fg-muted);
+    }
+
+    .affiliations sup {
+      margin-right: 0.1rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<!-- Hero - Clean Header -->
+<section class="hero">
+  <div class="hero-content">
+    <h1 class="hero-title reveal">
+      Learning <em>Self-Correction</em> in Vision–Language Models via Rollout Augmentation
+    </h1>
+
+    <div class="authors reveal">
+      <div class="authors-list">
+        <a href="https://dripnowhy.github.io/">Yi Ding</a><sup>1</sup>
+        <span class="sep">·</span>
+        <a href="">Ziliang Qiu</a><sup>2</sup>
+        <span class="sep">·</span>
+        <a href="https://lblaoke.github.io/">Bolian Li</a><sup>1</sup>
+        <span class="sep">·</span>
+        <a href="https://ruqizhang.github.io/">Ruqi Zhang</a><sup>1</sup>
+      </div>
+      <div class="affiliations">
+        <sup>1</sup>Purdue University · <sup>2</sup>University of Illinois Urbana-Champaign
+      </div>
+    </div>
+
+    <div class="btn-group reveal">
+      <a href="#" class="btn">
+        <i class="ai ai-arxiv"></i> arXiv
+      </a>
+      <a href="#" class="btn">
+        <i class="fas fa-file-pdf"></i> Paper
+      </a>
+      <a href="#" class="btn">
+        <i class="fab fa-github"></i> Code
+      </a>
+      <a href="#" class="btn">
+        <span>🤗</span> Model
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Interactive Case Demo -->
+<section class="case-section">
+  <div class="case-container">
+    <div class="case-question">
+      <span class="q-label">Example Question</span>
+      <h3>What's the lowest number yard line that you can see?</h3>
+    </div>
+
+    <div class="case-demo">
+      <!-- Left: Image -->
+      <div class="case-image-wrap">
+        <img src="static/images/case.png" alt="Football field yard lines">
+        <div class="image-overlay" id="imageOverlay"></div>
+      </div>
+
+      <!-- Center: Octopus -->
+      <div class="case-octopus">
+        <div class="orbit-ring ring-outer"></div>
+        <div class="orbit-ring ring-inner"></div>
+        <div class="logo-core" id="logoCore">
+          <img src="static/images/logo.png" alt="Octopus" class="logo-img" id="logoImg">
+          <div class="status-indicator" id="statusIndicator"></div>
+        </div>
+        <div class="octopus-status" id="footerStatus">🐙 Analyzing...</div>
+      </div>
+
+      <!-- Right: Output Panels -->
+      <div class="case-outputs">
+        <div class="output-panel" id="neuralPanel">
+          <div class="panel-header">
+            <span class="panel-dot" id="neuralDot"></span>
+            <span>neural output</span>
+          </div>
+          <div class="panel-body">
+            <span id="brainTypewriter"></span>
+            <span class="cursor-blink">|</span>
+          </div>
+        </div>
+
+        <div class="output-panel" id="tracePanel">
+          <div class="panel-header">
+            <span class="panel-dot active" id="traceDot"></span>
+            <span>correction trace</span>
+          </div>
+          <div class="panel-body trace-flow">
+            <div class="trace-step" id="traceStep1">
+              <span class="step-badge">1</span>
+              <span class="step-name">initial</span>
+              <span class="step-ans" id="ans1"></span>
+              <span class="step-mark" id="mark1"></span>
+            </div>
+            <div class="step-arrow" id="stepArrow">↓</div>
+            <div class="trace-step" id="traceStep2">
+              <span class="step-badge">2</span>
+              <span class="step-name" id="tag2">corrected</span>
+              <span class="step-ans" id="ans2"></span>
+              <span class="step-mark" id="mark2"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Introduction -->
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="section-label">01 — Overview</div>
+      <h2 class="section-title">Introduction</h2>
+    </div>
+
+    <div class="abstract reveal">
+      <p>
+        Self-correction is essential for solving complex reasoning problems in vision–language models (VLMs). However, existing reinforcement learning (RL) methods struggle to learn it, as effective self-correction behaviors emerge only rarely, making learning signals extremely sparse.
+      </p>
+      <p>
+        To address this challenge, we propose <strong>correction-specific rollouts (Octopus)</strong>, a rollout augmentation framework that synthesizes dense self-correction examples by recombining existing rollouts. This augmentation simultaneously improves sample efficiency due to rollout reuse and stabilizes RL optimization through balanced supervision.
+      </p>
+      <p>
+        Furthermore, we introduce a response-masking strategy that decouples self-correction from direct reasoning, avoiding signal conflicts and enabling both behaviors to be learned effectively. Building on this, we introduce <strong>Octopus-8B</strong>, a reasoning VLM with controllable self-correction capability. Across 7 benchmarks, it achieves SoTA performance among open-source VLMs.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- Problem -->
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="section-label">02 — Challenge</div>
+      <h2 class="section-title">Sparsity of Self-Correction Signals</h2>
+      <p class="section-subtitle">Why existing RL methods fail to learn effective self-correction</p>
+    </div>
+
+    <div class="two-col">
+      <div class="content-block reveal">
+        <h3>
+          Traditional RL
+          <span class="tag tag-error">Limitation</span>
+        </h3>
+        <p>Self-correction is not explicitly taught to the model; only outcome reward serves as supervision.</p>
+        <ul style="margin-top: 1rem;">
+          <li><strong>Training:</strong> No explicit signal to improve self-correction capability</li>
+          <li><strong>Inference:</strong> Unable to reliably control self-correction behavior</li>
+        </ul>
+        <div class="figure">
+          <img src="static/images/tradition_rl.png" alt="Traditional RL">
+        </div>
+        <p>Even with reflective words appended, the model struggles to revise incorrect answers.</p>
+      </div>
+
+      <div class="content-block reveal">
+        <h3>
+          Self-Reflection RL (SRPO)
+          <span class="tag tag-error">Failure</span>
+        </h3>
+        <p>SRPO attempts to teach self-correction through reflection-based prompts and shaped rewards.</p>
+        <div class="figure">
+          <img src="static/images/srpo.png" alt="SRPO">
+        </div>
+        <p><strong>Why it fails:</strong></p>
+        <ul>
+          <li><strong>Sparse Signals:</strong> Effective self-correction trajectories are extremely rare</li>
+          <li>Model maximizes reward through direct generation instead of learning to self-correct</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Solution -->
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="section-label">03 — Solution</div>
+      <h2 class="section-title">Octopus Framework</h2>
+      <p class="section-subtitle">When signals are sparse, we synthesize</p>
+    </div>
+
+    <div class="highlight-box reveal">
+      <div class="badge">
+        <i class="fas fa-code-branch"></i> Octopus
+      </div>
+      <h3>Rollout Augmentation for Dense Self-Correction Signals</h3>
+      <p>
+        A key observation motivating our approach is that effective self-correction signals already exist in standard RL rollouts: for a given input, incorrect and correct responses often coexist within the same rollout group. By pairing them, we explicitly construct samples that demonstrate effective correction behavior.
+      </p>
+      <div class="figure" style="margin: 2rem auto; max-width: 800px;">
+        <img src="static/images/octopus.png" alt="Octopus Framework">
+      </div>
+    </div>
+
+    <div class="feature-row reveal">
+      <div class="feature-item">
+        <h4>Dense Self-correction Signals</h4>
+        <p>Produces dense, explicit self-correction examples through rollout recombination</p>
+      </div>
+      <div class="feature-item">
+        <h4>Balanced Training Signals</h4>
+        <p>Balances positive and negative samples, stabilizing RL optimization</p>
+      </div>
+      <div class="feature-item">
+        <h4>Sample Efficiency</h4>
+        <p>Substantially improves efficiency by reusing existing rollouts</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Method -->
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="section-label">04 — Methodology</div>
+      <h2 class="section-title">Training via Response-Masking</h2>
+      <p class="section-subtitle">Decoupling self-correction from direct reasoning</p>
+    </div>
+
+    <div class="two-col">
+      <div class="content-block reveal">
+        <h3>
+          Conflicts in RL Training
+          <span class="tag tag-error">Problem</span>
+        </h3>
+        <p style="font-weight: 500; color: var(--fg); margin-bottom: 1rem;">Two Reward Designs</p>
+        <ul>
+          <li><strong>Binary Reward:</strong> Only assigns reward based on final answer correctness</li>
+          <li><strong>Shaped Reward:</strong> Encourages positive self-correction:
+            <ul style="margin-top: 0.5rem; font-size: 0.9rem;">
+              <li>Incorrect → Correct: <strong>1.0</strong></li>
+              <li>Correct → Correct: <strong>0.75</strong></li>
+              <li>Incorrect → Incorrect: <strong>0.0</strong></li>
+              <li>Correct → Incorrect: <strong>-0.25</strong></li>
+            </ul>
+          </li>
+        </ul>
+        <div class="figure">
+          <img src="static/images/conflicts.png" alt="Conflicts">
+        </div>
+        <div class="takeaway">
+          <div class="takeaway-label">Takeaway</div>
+          <p>Jointly optimizing self-correction and direct reasoning limits self-correction learning. Reward shaping alone fails to decouple these signals and instead induces reward hacking and mode collapse.</p>
+        </div>
+      </div>
+
+      <div class="content-block reveal">
+        <h3>
+          Two-Stage Training
+          <span class="tag tag-success">Solution</span>
+        </h3>
+
+        <p style="font-weight: 500; color: var(--fg); margin-bottom: 0.5rem;">Stage I: Learning Self-Correction Only</p>
+        <ul style="margin-bottom: 1.5rem;">
+          <li>Treat pre-correction response $o_1$ as input</li>
+          <li>Mask loss for all tokens in $o_1$</li>
+          <li>Apply KL loss on $o_1$ to constrain distribution</li>
+        </ul>
+
+        <p style="font-weight: 500; color: var(--fg); margin-bottom: 0.5rem;">Stage II: Co-evolving Both Capabilities</p>
+        <ul style="margin-bottom: 1.5rem;">
+          <li>Remove KL constraint</li>
+          <li>Unmask $o_1$ only for consistent correctness samples</li>
+          <li>Prevent gradient conflicts for inconsistent samples</li>
+        </ul>
+
+        <div class="figure">
+          <img src="static/images/two_stage.png" alt="Two Stage">
+        </div>
+        <div class="takeaway">
+          <div class="takeaway-label">Takeaway</div>
+          <p>Stage I isolates self-correction learning by treating $o_1$ as fixed context and updating the policy only from $o_2$. Stage II selectively unmasks $o_1$ when reward signals are non-conflicting, co-evolving both direct reasoning and self-correction.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Experiments -->
+<section class="section" id="Experiments">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="section-label">05 — Results</div>
+      <h2 class="section-title">Experiments</h2>
+    </div>
+
+    <div class="experiment reveal">
+      <div class="experiment-header">
+        <span class="experiment-num">01</span>
+        <span class="experiment-title">Main Results</span>
+      </div>
+      <div class="experiment-body">
+        <img src="static/images/main.png" alt="Main Results">
+      </div>
+    </div>
+
+    <div class="experiment reveal">
+      <div class="experiment-header">
+        <span class="experiment-num">02</span>
+        <span class="experiment-title">Ablation Study</span>
+      </div>
+      <div class="experiment-body">
+        <img src="static/images/ablation.png" alt="Ablation">
+      </div>
+    </div>
+
+    <div class="experiment reveal">
+      <div class="experiment-header">
+        <span class="experiment-num">03</span>
+        <span class="experiment-title">Test-Time Scaling</span>
+      </div>
+      <div class="experiment-body">
+        <img src="static/images/tts.png" alt="Test-Time Scaling" style="max-width: 70%;">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Case Studies -->
+<section class="section" id="CaseStudies">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="section-label">06 — Examples</div>
+      <h2 class="section-title">Case Studies</h2>
+    </div>
+
+    <div class="carousel-wrap reveal">
+      <div class="carousel-viewport">
+        <div class="carousel-track">
+          <div class="carousel-slide">
+            <img src="static/images/case1.png" alt="Case 1">
+          </div>
+          <div class="carousel-slide">
+            <img src="static/images/case2.png" alt="Case 2">
+          </div>
+          <div class="carousel-slide">
+            <img src="static/images/case3.png" alt="Case 3">
+          </div>
+        </div>
+      </div>
+
+      <div class="carousel-nav">
+        <button class="carousel-arrow prev">&#10094;</button>
+        <div class="carousel-dots">
+          <span class="carousel-dot active" data-index="0"></span>
+          <span class="carousel-dot" data-index="1"></span>
+          <span class="carousel-dot" data-index="2"></span>
+        </div>
+        <button class="carousel-arrow next">&#10095;</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BibTeX -->
+<section class="section" id="BibTeX">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="section-label">07 — Citation</div>
+      <h2 class="section-title">Reference</h2>
+      <p class="section-subtitle">If you find our work useful, please consider citing</p>
+    </div>
+
+    <div class="bibtex-block reveal">
+      <div class="bibtex-header">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="bibtex-body">
+        <pre>@article{ding2025octopus,
+  title={Learning Self-Correction in Vision–Language Models via Rollout Augmentation},
+  author={Ding, Yi and Qiu, Ziliang and Li, Bolian and Zhang, Ruqi},
+  journal={arXiv preprint},
+  year={2025}
+}</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="container">
+    <p>
+      This website is licensed under a <a href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative Commons Attribution-ShareAlike 4.0 International License</a>.
+    </p>
+    <p style="margin-top: 0.5rem; opacity: 0.7;">
+      © 2025 Octopus Project
+    </p>
+  </div>
+</footer>
+
+<script>
+  // Scroll Animation - triggers every time element enters viewport
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('active');
+      } else {
+        entry.target.classList.remove('active');
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // KaTeX
+  document.addEventListener('DOMContentLoaded', () => {
+    if (typeof renderMathInElement !== 'undefined') {
+      renderMathInElement(document.body, {
+        delimiters: [
+          {left: "$$", right: "$$", display: true},
+          {left: "$", right: "$", display: false}
+        ]
+      });
+    }
+
+    // Carousel
+    const track = document.querySelector('.carousel-track');
+    const dots = document.querySelectorAll('.carousel-dot');
+    let current = 0;
+
+    function goTo(index) {
+      current = index;
+      if (current < 0) current = 2;
+      if (current > 2) current = 0;
+      track.style.transform = `translateX(-${current * 100}%)`;
+      dots.forEach((d, i) => d.classList.toggle('active', i === current));
+    }
+
+    document.querySelector('.carousel-arrow.prev').addEventListener('click', () => goTo(current - 1));
+    document.querySelector('.carousel-arrow.next').addEventListener('click', () => goTo(current + 1));
+    dots.forEach((d, i) => d.addEventListener('click', () => goTo(i)));
+
+    setInterval(() => goTo(current + 1), 5000);
+
+    // Octopus Self-Correction Animation - Vertical Layout
+    const logoImg = document.getElementById('logoImg');
+    const statusIndicator = document.getElementById('statusIndicator');
+    const neuralPanel = document.getElementById('neuralPanel');
+    const tracePanel = document.getElementById('tracePanel');
+    const brainTypewriter = document.getElementById('brainTypewriter');
+    const footerStatus = document.getElementById('footerStatus');
+    const imageOverlay = document.getElementById('imageOverlay');
+
+    const traceStep1 = document.getElementById('traceStep1');
+    const traceStep2 = document.getElementById('traceStep2');
+    const stepArrow = document.getElementById('stepArrow');
+    const ans1 = document.getElementById('ans1');
+    const ans2 = document.getElementById('ans2');
+    const mark1 = document.getElementById('mark1');
+    const mark2 = document.getElementById('mark2');
+    const tag2 = document.getElementById('tag2');
+
+    async function runDemo() {
+      // Reset
+      brainTypewriter.textContent = '';
+      traceStep1.classList.remove('active');
+      traceStep2.classList.remove('active');
+      stepArrow.classList.remove('show');
+      ans1.textContent = '';
+      ans1.className = 'step-ans';
+      ans2.textContent = '';
+      ans2.className = 'step-ans';
+      mark1.textContent = '';
+      mark2.textContent = '';
+      tag2.textContent = 'pending';
+      tag2.className = 'step-name';
+      imageOverlay.classList.remove('active');
+
+      // Step 1: Initial thinking
+      logoImg.className = 'logo-img thinking';
+      statusIndicator.classList.add('active');
+      statusIndicator.style.background = '#ffb800';
+      footerStatus.textContent = '🐙 Analyzing image...';
+      imageOverlay.classList.add('active');
+
+      await sleep(300);
+
+      // Type in neural panel - fast word-by-word
+      await typeText(brainTypewriter, 'I need to identify the lowest numbered yard line visible in the image. Looking at the field, I can see the yard lines marked with numbers. Starting from the bottom of the image, I can clearly see the number 30 on the field. Moving up, I can see 40, 50, and 60 as well. The 1 is visible as part of the 1 on the 1-yard line, which is near the goal line. The 1 is at the very end of the field, so it should be the lowest numbered yard line. Therefore, the lowest number yard line I can see is 1.');
+      await sleep(200);
+
+      // Show wrong answer
+      traceStep1.classList.add('active');
+      ans1.textContent = '"1"';
+      ans1.className = 'step-ans wrong';
+      mark1.textContent = '✗';
+
+      await sleep(300);
+
+      logoImg.className = 'logo-img correcting';
+      statusIndicator.style.background = '#ff3b30';
+      footerStatus.textContent = '🐙 Detected inconsistency...';
+
+      await sleep(400);
+
+      // Step 2: Self-correction flow
+      traceStep1.classList.remove('active');
+      stepArrow.classList.add('show');
+      await sleep(200);
+
+      traceStep2.classList.add('active');
+      tag2.textContent = 'correcting';
+      tag2.className = 'step-name correct';
+      footerStatus.textContent = '🐙 Self-correcting...';
+
+      await sleep(200);
+
+      // Step 3: Correct output
+      logoImg.className = 'logo-img correct';
+      statusIndicator.style.background = '#34c759';
+
+      // Continue typing in neural panel
+      brainTypewriter.textContent = '';
+      await typeText(brainTypewriter, '<sc> To determine the lowest numbered yard line visible, I need to examine the yard line markings on the field. The yard lines are clearly labeled with numbers, and I can see several of them. Starting from the bottom of the image (closest to the viewer), the visible numbers are: - 30 - 40 - 50 - 60. "1" not clearly visible. Confirmed lowest: 30.');
+      await sleep(150);
+
+      ans2.textContent = '30';
+      ans2.className = 'step-ans correct';
+      mark2.textContent = '✓';
+      tag2.textContent = 'corrected';
+      traceStep2.classList.remove('active');
+
+      await sleep(150);
+
+      logoImg.className = 'logo-img';
+      statusIndicator.classList.remove('active');
+      footerStatus.textContent = '🐙 Self-correction complete';
+      imageOverlay.classList.remove('active');
+
+      await sleep(2000);
+
+      // Loop
+      runDemo();
+    }
+
+    function typeText(element, text) {
+      return new Promise(resolve => {
+        const words = text.split(/(\s+|[.,;!?])/); // Split by spaces and punctuation but keep delimiters
+        let i = 0;
+        element.textContent = '';
+        function type() {
+          if (i < words.length) {
+            element.textContent += words[i];
+            i++;
+            setTimeout(type, 30); // Faster speed for word-by-word typing
+          } else {
+            resolve();
+          }
+        }
+        type();
+      });
+    }
+
+    function sleep(ms) {
+      return new Promise(r => setTimeout(r, ms));
+    }
+
+    // Start demo
+    setTimeout(runDemo, 800);
+  });
+</script>
+
+</body>
+</html>

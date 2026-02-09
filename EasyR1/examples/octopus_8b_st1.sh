@@ -23,12 +23,12 @@ python3 -m verl.trainer.main \
     data.train_files=$virl39k_train_path \
     data.max_prompt_length=2048 \
     data.max_response_length=6144 \
-    data.rollout_batch_size=128 \
+    data.rollout_batch_size=512 \
     data.val_files="$val_files" \
     data.shuffle=true \
     data.format_prompt=./examples/format_prompt/reasoning_sc.jinja \
     worker.actor.model.model_path=${MODEL_PATH} \
-    worker.actor.global_batch_size=512 \
+    worker.actor.global_batch_size=128 \
     worker.actor.micro_batch_size_per_device_for_update=2 \
     worker.actor.micro_batch_size_per_device_for_experience=4 \
     worker.actor.optim.strategy=adamw_bf16 \

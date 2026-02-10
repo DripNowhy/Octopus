@@ -1094,7 +1094,7 @@
     <div class="section-header reveal">
       <div class="section-label">02 — Challenge</div>
       <h2 class="section-title">Sparsity of Self-Correction Signals</h2>
-      <p class="section-subtitle">Why existing RL methods fail to learn effective self-correction</p>
+      <p class="section-subtitle">Why existing RL methods hard to learn effective self-correction</p>
     </div>
 
     <div class="two-col">
@@ -1123,7 +1123,7 @@
         <div class="figure">
           <img src="static/images/srpo.png" alt="SRPO">
         </div>
-        <p><strong>Why it hard to enhance self-correction:</strong></p>
+        <p><strong>Why it hard to learn self-correction:</strong></p>
         <ul>
           <li><strong>Sparse Signals:</strong> Effective self-correction trajectories are extremely rare</li>
           <li>Model maximizes reward through direct generation instead of learning to self-correct</li>
@@ -1494,8 +1494,7 @@
 
       await sleep(2000);
 
-      // Loop
-      runDemo();
+
     }
 
     function typeText(element, text) {

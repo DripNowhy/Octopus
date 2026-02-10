@@ -4,7 +4,7 @@
 
 <h5 align="center">
 
-[![Paper](https://img.shields.io/badge/paper-A42C25?style=for-the-badge&logo=arxiv&logoColor=white)](http://arxiv.org/abs/) [![Page](https://img.shields.io/badge/Project_page-2C7AC3?style=for-the-badge&logo=arcgis&logoColor=white)](https://dripnowhy.github.io/Octopus/) [![Hugging Face Collection](https://img.shields.io/badge/Model_Checkpoints-fcd022?style=for-the-badge&logo=huggingface&logoColor=000)](https://huggingface.co/collections/Tuwhy/octopus) [![GitHub Stars](https://img.shields.io/github/stars/DripNowhy/Octopus?style=for-the-badge&logo=github&logoColor=white&label=Stars&color=000000)](https://github.com/DripNowhy/Octopus)
+[![Paper](https://img.shields.io/badge/paper-A42C25?style=for-the-badge&logo=arxiv&logoColor=white)](https://arxiv.org/pdf/2602.08503) [![Page](https://img.shields.io/badge/Project_page-2C7AC3?style=for-the-badge&logo=arcgis&logoColor=white)](https://dripnowhy.github.io/Octopus/) [![Hugging Face Collection](https://img.shields.io/badge/Model_Checkpoints-fcd022?style=for-the-badge&logo=huggingface&logoColor=000)](https://huggingface.co/collections/Tuwhy/octopus) [![GitHub Stars](https://img.shields.io/github/stars/DripNowhy/Octopus?style=for-the-badge&logo=github&logoColor=white&label=Stars&color=000000)](https://github.com/DripNowhy/Octopus)
 <!-- [![Twitter](https://img.shields.io/badge/Twitter-000000?style=for-the-badge&logo=x&logoColor=white)](https://huggingface.co/collections/Tuwhy/sherlock-6835f46e450a48f228f7e80d)  -->
 
 

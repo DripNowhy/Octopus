@@ -188,10 +188,10 @@ If you find our project helpful, please cite our series papers as:
   year={2025}
 }
 
-@article{ding2026octopus,
+@article{ding2026learning,
   title={Learning Self-Correction in Vision-Language Models via Rollout Augmentation},
-  author={Ding, Yi and Li, Bolian and Zhang, Ruqi},
-  journal={arXiv preprint arXiv:xxxx.xxxxx},
+  author={Ding, Yi and Qiu, Ziliang and Li, Bolian and Zhang, Ruqi},
+  journal={arXiv preprint arXiv:2602.08503},
   year={2026}
 }
 ```

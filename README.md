@@ -181,17 +181,19 @@ Our project benefits from [LLaVA-CoT](https://github.com/PKU-YuanGroup/LLaVA-CoT
 
 If you find our project helpful, please cite our series papers as:
 ```bibtex
-@article{ding2025sherlock,
-  title={Sherlock: Self-Correcting Reasoning in Vision-Language Models},
-  author={Ding, Yi and Zhang, Ruqi},
-  journal={arXiv preprint arXiv:2505.22651},
-  year={2025}
-}
-
 @article{ding2026learning,
   title={Learning Self-Correction in Vision-Language Models via Rollout Augmentation},
   author={Ding, Yi and Qiu, Ziliang and Li, Bolian and Zhang, Ruqi},
   journal={arXiv preprint arXiv:2602.08503},
+  year={2026}
+}
+
+@article{ding2026sherlock,
+  title={Sherlock: Self-correcting reasoning in vision-language models},
+  author={Ding, Yi and Zhang, Ruqi},
+  journal={Advances in Neural Information Processing Systems},
+  volume={38},
+  pages={101638--101672},
   year={2026}
 }
 ```
